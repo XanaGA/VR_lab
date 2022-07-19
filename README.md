@@ -1,3 +1,3 @@
 # VR_lab
 
-A repository to store the development of the VR Lab at UEF
+A repository to track the developments done in the VR Lab at UEF
