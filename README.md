@@ -42,14 +42,57 @@ IMAGEN
 - void  **InsertMarker**(*const  float  marker_id*): It will insert a marker into the data stream. This is represented as a positive float numer that will be written in the marker channel at the timestamp that was introduced. This channel (remember channels are rows in the BrainflowArray) is always 0, except when a marker is introduces, then it takes the value of the marker. It behaves like a STIM channel. To know more about them check this [resource](https://mne.tools/stable/auto_tutorials/intro/20_events_from_raw.html#what-is-a-stim-channel) from mne documentation. This allows us to link BCI readings with events that we place in our level. **Warning:** If you are using a wireless connection you should consider that may be some latency. This fact can make some scenarios unusable. *Blueprint Callable*. IMAGEN
 
 - void  **GetMetrics**(*const  float  TimeWindow, const  TEnumAsByte<Prediction> Method, double&  Mindfulness, double&  Restfulness, double&  Timestamp*): This function gets the data from the `BoardShim` object, `board`. With that calculates the *Mindfulness* and *Resfulness*. The number of samples taken for the calculation are such that they cover the last *n seconds* determined by the `TimeWindow` argument. It also returns the timestamp from the last sample sent by the device. The `Method` argument allows us to choose which algorithm to use in order to get the metrics. Only two methods are supported by default, but you can add your custom algorithms or classifiers:
+	
 		- *BrainFlow classifiers*: Those are the `MLModel`objects provided by dafault by BrainFlow. Those are the ones that we initialize in `BeginPlay` and prepare in `StartSession`.
+	
 		- *Running Average*: Algorithm based on the project by ChilloutCharles using [Muse in VRChat](https://github.com/ChilloutCharles/BrainFlowsIntoVRChat). It basically takes into consideration the Beta and Alpha waves ratio against Theta waves.
+	
  You are encouraged to try your own models. BrainFlow [supports onnx](https://brainflow.org/2022-06-09-onnx/) format and UE introduced the [NNI](https://docs.unrealengine.com/5.0/en-US/API/Plugins/NeuralNetworkInference/) to use Neural Networks, which is also built on top on onnx. *Blueprint Callable*. IMAGEN
 
-- void  **GetMotion**(*FVector&  Gyroscope, FVector&  Accelerometer, double&  Timestamp*)
+- void  **GetMotion**(*FVector&  Gyroscope, FVector&  Accelerometer, double&  Timestamp*): It returns physical data from the device such as the Gyroscope and Accelerometer reading in case the device provides them. Those are 3-dimensional vectors indicating the value for each coordinate in the space.
+
+- void  **GetDeviceStatus**(*float&  Battery, bool&  Connected, double&  Timestamp*): This will return the battery of the device and a boolean telling if it is connected or not. *Blueprint Callable*. IMAGEN
+
+- void  **GetBands**(*const  float  Window, double&  Alpha, double&  Beta, double&  Gamma, double&  Delta, double&  Theta, double&  Timestamp, const  bool  Detrend=true*): This returns distinct frequency bands averaging across all the channels. Note that as we are working in the frequency domain we loose the temporal information. The `Detrend` argument indicates if we want to perform a [detrending operation](https://brainflow.readthedocs.io/en/stable/UserAPI.html#c-api-reference) (removing trends of the data) or not.*Blueprint Callable*. IMAGEN 
 
 ## Blueprints
 
+
 ## Python Scripts
+This folder contains Python code used, for example for visualizations. These are intended to be used to process data from a saved session into a .csv file. You can use the *SaveSession* node to do so. 
+
+Unreal Engine 5 already has the Python plugin activated by default. If it is not the case, you have to activate it.
+
+### Requirements
+The following libraries are required:
+ -  Brainflow: The Python version of the Brainflow library, to read the data from the .csv file.
+ - Mne: Well known library to work with neurophysiological data.
+ - Pandas
+ - Numpy
+ - Matplotlib
+ - PyQt5
+
+If you want You can install this libraries by hand, but you have to make sure that are installed in the Ureal Engine interpreter. You can check where is it by running `unreal.get_interpreter_executable_path()` in the python log in UE. Even though, the *init_unreal.py* will check if those are installed and install the ones that are left. 
+Moreover, if you are a frequent python user you may have some of them already installed. Other oprion is to add the path where those are to libraries path inside *Python Plugin* in *Project Settings*.
+
+### init_unreal.py
+This script is run every time the editor is started. It will check if all the required libraries mentioned above are installed and, if some are not, it will install them. It will also import all the python files that contain blueprint callable functions, so they are accesible from blueprints as nodes.
+
+###  mne_utils.py
+It basically make the bridge between Brainflow and MNE. Functions:
+- **create_raw_eeg_mne**(*file_path: str, board_id: int, events = False*):It reads de .csv file and creates a MNE `rawArray` object with that data. The `board_id` referes to the board with which the stored data was recorded. If `events = True`, then the marker channel is considered used as a [STIM channel](https://mne.tools/stable/auto_tutorials/intro/20_events_from_raw.html#what-is-a-stim-channel).
+
+### PlottingFunc.py
+This contains a class that inherits from `BlueprintFunctionLibrary` so the function we define inside this can be called in blueprints. Note that we need to use the `@unreal.class` and `@unreal.ufunction` decorators.
+- **PlotRawEeg**(*saved_data, board_id, duration, events*): Plots the raw data since the start until `duration`(seconds). If `events = True` it also plot the events as a vertical line.
+- **PlotBandPowers**(*saved_data, board_id, avg*): This will plot the data in the frequency spectrum. You can choose if average between all channels or plot them individually usin the `avg` argument.
+- **PlotEvents**(*saved_data, board_id*): This will plot only the events occured.
 
 ## Widgets
+### Visualizer
+It displays a widget that allows you to plot the data saved in a .csv file from inside the editor, allowing for faster prototyping and debugging. 
+It uses the functions defined in *PlottingFunc.py*. Note that if you do not close the widget before closing the editor, the next time you open it it will require you to manually refresh the nodes:
+IMAGEN
+	
+You can do it, or you can use a plugin like [refresh all nodes](https://github.com/nachomonkey/refreshallnodes), which allows you to refresh all the nodes of a blueprint, folder or even your whole experiment.
+IMAGEN
